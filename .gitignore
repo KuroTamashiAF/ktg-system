@@ -1,0 +1,142 @@
+# =====================================================
+# Django & Python
+# =====================================================
+
+# Виртуальные окружения
+venv/
+env/
+ENV/
+.venv/
+venv.bak/
+env.bak/
+
+# Кэш Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Компилированные расширения
+*.so
+
+# Файлы дистрибутивов и упаковки
+*.egg
+*.egg-info/
+*.whl
+*.tar.gz
+*.zip
+build/
+dist/
+MANIFEST
+develop-eggs/
+eggs/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+.eggs/
+.pdm-build/
+.pybuilder/
+.python-eggs/
+
+# Локальная база данных SQLite
+db.sqlite3
+db.sqlite3-journal
+
+# Загружаемые файлы (media)
+media/
+
+# Собранные статические файлы (не коммить, собирай на сервере)
+staticfiles/
+collected_static/
+
+# Настройки окружения и секреты
+.env
+.env.*
+.env.local
+.env.production
+.env.development
+local_settings.py
+*.crt
+*.key
+*.pem
+*.secret
+id_rsa
+id_dsa
+
+# Логи и временные файлы
+*.log
+*.log.*
+logs/
+tmp/
+*.pid
+*.pid.lock
+
+# =====================================================
+# Тестирование и покрытие кода
+# =====================================================
+.coverage
+.coverage.*
+.coverage.xml
+.coverage_html/
+.hypothesis/
+htmlcov/
+junit.xml
+nosetests.xml
+test-output/
+test-reports/
+test-results/
+tests/.coverage*
+tests/coverage_html/
+.pytest_cache/
+.tox/
+.mypy_cache/
+.pyre/
+.pytype/
+.nox/
+dmypy.json
+.dmypy.json
+
+# =====================================================
+# IDE и редакторы
+# =====================================================
+# PyCharm
+.idea/
+*.iml
+*.ipr
+*.iws
+
+# VS Code
+.vscode/
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# Spyder
+.spyderproject
+.spyproject/
+
+# Rope
+.ropeproject/
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# Emacs
+*~
+\#*\#
+.\#*
+
+# Vim
+*.swp
+*.swo
+*.swn
+.*.sw[a-p]
+
+# macOS
+.DS_Store
+.DS_Store?
