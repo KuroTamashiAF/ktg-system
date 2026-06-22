@@ -11,21 +11,24 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 """
 
 from pathlib import Path
-
+from dotenv import load_dotenv
+import os 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+load_dotenv(BASE_DIR / ".env")
 
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-#)3cxhk5r&itm_pfh*1_(#%1))4dhqf&tix3&91dbv9+92+ltw'
+# SECRET_KEY = 'django-insecure-#)3cxhk5r&itm_pfh*1_(#%1))4dhqf&tix3&91dbv9+92+ltw'
+SECRET_KEY = os.getenv("SECRET_KEY")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.getenv("DEBUG")
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS").split(",")
 
 
 # Application definition
@@ -36,8 +39,17 @@ INSTALLED_APPS = [
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
-    'django.contrib.staticfiles'
-    # 'accounts',
+    'django.contrib.staticfiles',
+
+    'channels',
+
+    'apps.accounts',
+    'apps.core',
+    'apps.documents',
+    'apps.fleet',
+    'apps.notifications',
+    'apps.repairs',
+    'apps.telemetry'
 ]
 
 MIDDLEWARE = [
@@ -69,7 +81,8 @@ TEMPLATES = [
     },
 ]
 
-WSGI_APPLICATION = 'config.wsgi.application'
+# WSGI_APPLICATION = 'config.wsgi.application'
+ASGI_APPLICATION = 'config.asgi.application'
 
 
 # Database
@@ -123,3 +136,26 @@ STATICFILES_DIRS  = [
 ]
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
+AUTH_USER_MODEL = 'accounts.CustomUser'
+
+
+LOGGING = {
+    'version': 1,
+
+    'disable_existing_loggers': False,
+
+    'handlers': {
+        'file': {
+            'class':
+            'logging.FileHandler',
+
+            'filename':
+            BASE_DIR / 'logs/app.log',
+        },
+    },
+
+    'root': {
+        'handlers': ['file'],
+        'level': 'INFO',
+    },
+}
