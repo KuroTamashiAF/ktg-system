@@ -1,28 +1,62 @@
+{% load static %}
+
 <!DOCTYPE html>
 <html lang="ru">
-<head>
 
-    {% load static %}
+<head>
 
     <meta charset="UTF-8">
 
-    <meta name="viewport"
-          content="width=device-width, initial-scale=1.0">
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
 
     <title>
         {% block title %}
-        КТГ
+        Система КТГ
         {% endblock %}
     </title>
 
     <link rel="stylesheet"
           href="{% static 'css/base.css' %}">
 
+    <link rel="stylesheet"
+          href="{% static 'css/layout.css' %}">
+
 </head>
+
 <body>
 
-    {% block content %}
-    {% endblock %}
+<div class="layout">
+    {% if request.user.is_authenticated%}
+        <aside class="sidebar">
+
+            <div class="logo">
+                Система КТГ
+            </div>
+                <nav>
+                <a href="/">Главная</a>
+                {% if request.user.is_staff %}
+                    <a href="#">Администрирование</a>
+                {% endif %}
+                <a href="#">Машины</a>
+                <a href="#">Ремонты</a>
+                <a href="#">Документы</a>
+                <a href="/accounts/logout/"> Выход </a>
+            </nav>
+        </aside>
+    {% endif %}
+
+    <main class="content">
+
+        {% block content %}
+        {% endblock %}
+
+    </main>
+
+</div>
 
 </body>
+
 </html>

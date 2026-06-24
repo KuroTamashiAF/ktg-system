@@ -8,4 +8,4 @@ class UserLoginView(LoginView):
 
 
 class UserLogoutView(LogoutView):
-    pass
+    template_name = "accounts/logout.html"
