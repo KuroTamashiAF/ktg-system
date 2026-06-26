@@ -8,7 +8,3 @@ class TimeStampeModel(models.Model):
 
     class Meta:
         abstract = True
-
-
-class Machine(TimeStampeModel):
-    pass

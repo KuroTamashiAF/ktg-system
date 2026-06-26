@@ -1,8 +1,31 @@
 from django.contrib import admin
-from apps.accounts.models import CustomUser
 from django.contrib.auth.admin import UserAdmin
+from apps.accounts.models import User, Section
 
 
 # Register your models here.
 
-admin.site.register(CustomUser, UserAdmin)
+
+
+
+@admin.register(Section)
+class SectionAdmin(admin.ModelAdmin):
+    list_display = ('name',)
+    search_fields = ('name',)
+
+
+@admin.register(User)
+class CustomUserAdmin(UserAdmin):
+
+    list_display = (
+        'username', 'get_full_name',
+        'role', 'section', 'is_active'
+    )
+
+    list_filter = ('role', 'section')
+
+    fieldsets = UserAdmin.fieldsets + (
+        ('Доп. данные', {
+            'fields': ('patronim', 'section', 'role')
+        }),
+    )
