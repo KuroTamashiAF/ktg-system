@@ -10,6 +10,10 @@ class Machine(TimeStampeModel):
     ktg_value = models.FloatField(default=1.0, verbose_name="КТГ")
     ktg_threshold = models.FloatField(default=0.7, verbose_name="Порог КТГ")
     is_in_repair = models.BooleanField(default=False, verbose_name="В ремонте")
+    repair_started_at = models.DateTimeField(
+        null=True, blank=True, verbose_name="Начало ремонта (вручную)"
+    )
+
     image = models.ImageField(
         upload_to="machines/", blank=True, null=True, verbose_name="Фото"
     )

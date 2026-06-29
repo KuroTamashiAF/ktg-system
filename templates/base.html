@@ -4,59 +4,61 @@
 <html lang="ru">
 
 <head>
-
     <meta charset="UTF-8">
-
-    <meta
-        name="viewport"
-        content="width=device-width, initial-scale=1.0"
-    >
-
-    <title>
-        {% block title %}
-        Система КТГ
-        {% endblock %}
-    </title>
-
-    <link rel="stylesheet"
-          href="{% static 'css/base.css' %}">
-
-    <link rel="stylesheet"
-          href="{% static 'css/layout.css' %}">
-
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Система КТГ{% endblock %}</title>
+    <link rel="stylesheet" href="{% static 'css/base.css' %}">
+    <link rel="stylesheet" href="{% static 'css/layout.css' %}">
 </head>
 
 <body>
 
 <div class="layout">
-    {% if request.user.is_authenticated%}
+    {% if request.user.is_authenticated %}
         <aside class="sidebar">
-
-            <div class="logo">
-                Система КТГ
-            </div>
-                <nav>
+            <div class="logo">Система КТГ</div>
+            <nav>
                 <a href="/">Главная</a>
                 {% if request.user.is_staff %}
-                    <a href="#">Администрирование</a>
+                    <a href="/admin/">Администрирование</a>
                 {% endif %}
                 <a href="#">Машины</a>
                 <a href="#">Ремонты</a>
                 <a href="#">Документы</a>
-                <a href="/accounts/logout/"> Выход </a>
+                <a href="/accounts/logout/">Выход</a>
             </nav>
         </aside>
     {% endif %}
 
     <main class="content">
 
+        {% if request.user.is_authenticated %}
+        <!-- Шапка с пользователем — правый верхний угол -->
+        <div class="topbar">
+            <div class="topbar-user">
+                <!-- get_full_name() из модели User — возвращает ФИО -->
+                <span class="user-fullname">
+                    {{ request.user.get_full_name }}
+                </span>
+                <!-- username в скобках серым -->
+                <span class="user-username">
+                    ({{ request.user.username }})
+                </span>
+                <!-- Участок если есть -->
+                {% if request.user.section %}
+                    <span class="user-section">
+                        {{ request.user.section.name }}
+                    </span>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+
         {% block content %}
         {% endblock %}
 
     </main>
-
 </div>
 
 </body>
-
 </html>

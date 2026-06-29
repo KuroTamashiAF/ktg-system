@@ -1,7 +1,15 @@
 import json
+import asyncio
+from datetime import datetime, timezone
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
-from apps.fleet.models import Machine, RepairLog
+from apps.fleet.models import Machine, RepairLog, KTGHistory
+from apps.fleet.services.ktg_service import (
+    calculate_ktg_decrease_step,
+    calculate_ktg_from_date,
+)
+
+KTG_TICK_INTERVAL = 10
 
 
 class FleetConsumer(AsyncWebsocketConsumer):
@@ -16,16 +24,35 @@ class FleetConsumer(AsyncWebsocketConsumer):
             'machines': machines
         }))
 
+        self.ktg_task = asyncio.create_task(self.ktg_loop())
+
     async def disconnect(self, close_code):
         await self.channel_layer.group_discard('fleet', self.channel_name)
+        if hasattr(self, 'ktg_task'):
+            self.ktg_task.cancel()
 
     async def receive(self, text_data):
         data = json.loads(text_data)
 
         if data.get('action') == 'toggle_repair':
+            # Кнопка "в ремонт / завершить ремонт"
             machine_id = data.get('machine_id')
             user_id = self.scope['user'].id
             machine = await self.toggle_repair(machine_id, user_id)
+
+            await self.channel_layer.group_send('fleet', {
+                'type': 'fleet_update',
+                'machine': machine
+            })
+
+        elif data.get('action') == 'set_repair_date':
+            # Поле даты заполнено на dashboard
+            # Машина автоматически становится в ремонте
+            # КТГ пересчитывается сразу от введённой даты
+            machine_id = data.get('machine_id')
+            repair_date = data.get('repair_date')  # строка ISO формата
+            user_id = self.scope['user'].id
+            machine = await self.set_repair_date(machine_id, repair_date, user_id)
 
             await self.channel_layer.group_send('fleet', {
                 'type': 'fleet_update',
@@ -38,6 +65,82 @@ class FleetConsumer(AsyncWebsocketConsumer):
             'machine': event['machine']
         }))
 
+    async def ktg_loop(self):
+        try:
+            while True:
+                await asyncio.sleep(KTG_TICK_INTERVAL)
+                updated = await self.process_ktg_tick()
+
+                for machine in updated:
+                    await self.channel_layer.group_send('fleet', {
+                        'type': 'fleet_update',
+                        'machine': machine
+                    })
+
+        except asyncio.CancelledError:
+            pass
+
+    @database_sync_to_async
+    def process_ktg_tick(self):
+        step = calculate_ktg_decrease_step(KTG_TICK_INTERVAL)
+        machines_in_repair = Machine.objects.filter(is_in_repair=True)
+        updated = []
+
+        for machine in machines_in_repair:
+            if machine.repair_started_at is not None:
+                # Приоритет — ручная дата, пересчитываем целиком
+                machine.ktg_value = calculate_ktg_from_date(
+                    machine.repair_started_at
+                )
+            else:
+                # Обычный режим — снижаем на шаг
+                machine.ktg_value = round(machine.ktg_value - step, 6)
+                if machine.ktg_value < 0:
+                    machine.ktg_value = 0
+
+            machine.save()
+
+            KTGHistory.objects.create(
+                machine=machine,
+                value=machine.ktg_value
+            )
+
+            updated.append(self._serialize(machine))
+
+        return updated
+
+    @database_sync_to_async
+    def set_repair_date(self, machine_id, repair_date_str, user_id):
+        """
+        Устанавливает дату начала ремонта вручную.
+        Машина автоматически становится в ремонте.
+        КТГ пересчитывается сразу от введённой даты.
+        """
+        machine = Machine.objects.get(id=machine_id)
+
+        # Парсим дату из строки формата datetime-local: '2026-06-15T08:00'
+        repair_started_at = datetime.fromisoformat(repair_date_str)
+
+        # Сохраняем дату
+        machine.repair_started_at = repair_started_at
+
+        # Автоматически ставим в ремонт
+        machine.is_in_repair = True
+
+        # Сразу пересчитываем КТГ от введённой даты
+        machine.ktg_value = calculate_ktg_from_date(repair_started_at)
+        machine.save()
+
+        # Создаём лог ремонта если нет активного
+        if not RepairLog.objects.filter(machine=machine, is_active=True).exists():
+            RepairLog.objects.create(
+                machine=machine,
+                user_id=user_id,
+                is_active=True
+            )
+
+        return self._serialize(machine)
+
     @database_sync_to_async
     def get_machines(self):
         return [
@@ -49,15 +152,24 @@ class FleetConsumer(AsyncWebsocketConsumer):
     def toggle_repair(self, machine_id, user_id):
         machine = Machine.objects.get(id=machine_id)
         machine.is_in_repair = not machine.is_in_repair
-        machine.save()
 
         if machine.is_in_repair:
+            if machine.repair_started_at is not None:
+                machine.ktg_value = calculate_ktg_from_date(
+                    machine.repair_started_at
+                )
+            machine.save()
+
             RepairLog.objects.create(
                 machine=machine,
                 user_id=user_id,
                 is_active=True
             )
         else:
+            # Завершаем ремонт — очищаем дату
+            machine.repair_started_at = None
+            machine.save()
+
             RepairLog.objects.filter(
                 machine=machine,
                 is_active=True
@@ -70,7 +182,11 @@ class FleetConsumer(AsyncWebsocketConsumer):
             'id': m.id,
             'name': m.name,
             'board_number': m.board_number,
-            'ktg_value': round(m.ktg_value, 4),
+            'ktg_value': round(m.ktg_value, 6),
             'ktg_threshold': m.ktg_threshold,
             'is_in_repair': m.is_in_repair,
+            'repair_started_at': (
+                m.repair_started_at.isoformat()
+                if m.repair_started_at else None
+            ),
         }

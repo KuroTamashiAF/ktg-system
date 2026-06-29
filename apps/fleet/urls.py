@@ -22,5 +22,5 @@ from django.urls import path
 from apps.fleet.views import DashboardView
 
 urlpatterns = [
-    path("dasboard/", DashboardView.as_view(), name="dasboard"),
+    path("dashboard/", DashboardView.as_view(), name="dashboard"),
 ]

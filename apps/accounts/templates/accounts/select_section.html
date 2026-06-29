@@ -1,0 +1,98 @@
+{% extends 'base.html' %}
+
+{% block title %}Выбор участка{% endblock %}
+
+{% block content %}
+<div class="section-select-wrap">
+
+    <h1>Выберите участок</h1>
+    <p>На каком участке вы работаете сегодня?</p>
+
+    <form method="POST">
+        {% csrf_token %}
+        <div class="section-grid">
+            {% for section in sections %}
+                <button
+                    type="submit"
+                    name="section_id"
+                    value="{{ section.id }}"
+                    class="section-card {% if request.user.section_id == section.id %}active{% endif %}"
+                >
+                    {{ section.name }}
+                </button>
+            {% empty %}
+                <p>Участки не найдены. Обратитесь к администратору.</p>
+            {% endfor %}
+        </div>
+
+        <!-- Кнопка пропустить — если участок не важен -->
+        <button type="submit" name="section_id" value="" class="btn-skip">
+            Пропустить
+        </button>
+    </form>
+
+</div>
+
+<style>
+.section-select-wrap {
+    max-width: 600px;
+    margin: 60px auto;
+    text-align: center;
+}
+
+.section-select-wrap h1 {
+    font-size: 28px;
+    color: #1f2937;
+    margin-bottom: 8px;
+}
+
+.section-select-wrap p {
+    color: #6b7280;
+    margin-bottom: 32px;
+}
+
+.section-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+}
+
+.section-card {
+    padding: 24px 16px;
+    border: 2px solid #e5e7eb;
+    border-radius: 12px;
+    background: white;
+    font-size: 16px;
+    font-weight: 600;
+    color: #1f2937;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.section-card:hover {
+    border-color: #3b82f6;
+    background: #eff6ff;
+    color: #1d4ed8;
+}
+
+.section-card.active {
+    border-color: #3b82f6;
+    background: #eff6ff;
+    color: #1d4ed8;
+}
+
+.btn-skip {
+    background: none;
+    border: none;
+    color: #9ca3af;
+    font-size: 14px;
+    cursor: pointer;
+    text-decoration: underline;
+}
+
+.btn-skip:hover {
+    color: #6b7280;
+}
+</style>
+{% endblock %}

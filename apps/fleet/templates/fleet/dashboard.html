@@ -1,18 +1,262 @@
 {% extends 'base.html' %}
 
-{% block title %}
-    <title>Главная</title>
-{% endblock %}
-
 {% block content %}
+<div class="dashboard-wrap">
 
-<h1>
-    Панель управления
-</h1>
+    <div class="dashboard-header">
+        <h1>Диспетчерская панель</h1>
+        <span id="ws-status" class="ws-badge connecting">Подключение...</span>
+    </div>
 
-<p>
-    Пользователь:
-    {{ request.user.username }}
-</p>
+    <table class="machine-table">
+        <thead>
+            <tr>
+                <th>Машина</th>
+                <th>Борт №</th>
+                <th>КТГ</th>
+                <th>Порог</th>
+                <th>Статус</th>
+                <th>Начало ремонта</th>
+                <th>Действие</th>
+            </tr>
+        </thead>
+        <tbody id="machine-list">
+            <tr><td colspan="7">Загрузка...</td></tr>
+        </tbody>
+    </table>
 
+</div>
+
+<style>
+.dashboard-wrap { padding: 32px; }
+.dashboard-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 24px;
+}
+.ws-badge {
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 600;
+}
+.ws-badge.connecting { background: #fef3c7; color: #92400e; }
+.ws-badge.online     { background: #d1fae5; color: #065f46; }
+.ws-badge.offline    { background: #fee2e2; color: #991b1b; }
+
+.machine-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: white;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.07);
+}
+.machine-table th {
+    background: #1f2937;
+    color: white;
+    padding: 14px 18px;
+    text-align: left;
+    font-size: 14px;
+}
+.machine-table td {
+    padding: 12px 18px;
+    border-bottom: 1px solid #f3f4f6;
+    font-size: 14px;
+}
+.machine-table tr:last-child td { border-bottom: none; }
+.machine-table tr:hover td { background: #f9fafb; }
+
+.ktg-value { font-weight: 700; font-size: 15px; }
+.ktg-small { font-size: 11px; color: #9ca3af; margin-top: 2px; }
+.ktg-bar {
+    width: 100px; height: 6px;
+    background: #e5e7eb;
+    border-radius: 4px;
+    margin-top: 4px;
+}
+.ktg-bar-fill {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.4s ease;
+}
+
+.badge {
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+}
+.badge.repair { background: #fee2e2; color: #991b1b; }
+.badge.active { background: #d1fae5; color: #065f46; }
+
+/* Поле ввода даты */
+.date-input {
+    font-size: 12px;
+    padding: 6px 8px;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    color: #374151;
+    cursor: pointer;
+    width: 180px;
+}
+.date-input:focus {
+    outline: none;
+    border-color: #3b82f6;
+}
+.date-input.has-value {
+    border-color: #f59e0b;
+    background: #fffbeb;
+    color: #92400e;
+    font-weight: 600;
+}
+
+.btn-repair {
+    padding: 8px 16px;
+    border: none;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+.btn-repair.send   { background: #fee2e2; color: #991b1b; }
+.btn-repair.send:hover   { background: #fca5a5; }
+.btn-repair.finish { background: #d1fae5; color: #065f46; }
+.btn-repair.finish:hover { background: #6ee7b7; }
+</style>
+
+<script>
+const ws = new WebSocket('ws://' + window.location.host + '/ws/fleet/');
+const statusEl = document.getElementById('ws-status');
+
+ws.onopen = function() {
+    statusEl.textContent = 'Онлайн';
+    statusEl.className = 'ws-badge online';
+};
+
+ws.onclose = function() {
+    statusEl.textContent = 'Офлайн';
+    statusEl.className = 'ws-badge offline';
+};
+
+ws.onmessage = function(event) {
+    const data = JSON.parse(event.data);
+    if (data.type === 'init') {
+        renderAll(data.machines);
+    } else if (data.type === 'update') {
+        updateRow(data.machine);
+    }
+};
+
+function ktgColor(value, threshold) {
+    if (value >= 0.8) return '#16a34a';
+    if (value >= threshold) return '#d97706';
+    return '#dc2626';
+}
+
+function buildRow(m) {
+    const pct = (m.ktg_value * 100).toFixed(4);   // 4 знака: 95.3821%
+    const raw = m.ktg_value.toFixed(6);            // сырое значение: 0.953821
+    const threshold = (m.ktg_threshold * 100).toFixed(0);
+    const color = ktgColor(m.ktg_value, m.ktg_threshold);
+
+    const status = m.is_in_repair
+        ? '<span class="badge repair">Ремонт</span>'
+        : '<span class="badge active">Работает</span>';
+
+    const btnClass = m.is_in_repair ? 'finish' : 'send';
+    const btnText  = m.is_in_repair ? 'Завершить ремонт' : 'В ремонт';
+
+    // Форматируем дату для input[type=datetime-local]
+    // Формат: 2026-06-15T08:00
+    const dateValue = m.repair_started_at
+        ? m.repair_started_at.slice(0, 16)  // обрезаем секунды и timezone
+        : '';
+
+    const dateClass = dateValue ? 'date-input has-value' : 'date-input';
+
+    return `
+        <tr id="row-${m.id}">
+            <td>${m.name}</td>
+            <td>${m.board_number}</td>
+            <td>
+                <span class="ktg-value" style="color:${color}">${pct}%</span>
+                <div class="ktg-small">${raw}</div>
+                <div class="ktg-bar">
+                    <div class="ktg-bar-fill"
+                         style="width:${Math.min(parseFloat(pct),100)}%;
+                                background:${color}">
+                    </div>
+                </div>
+            </td>
+            <td>
+                <span style="color:${m.ktg_value < m.ktg_threshold ? '#dc2626' : '#6b7280'}">
+                    ${threshold}%
+                </span>
+            </td>
+            <td>${status}</td>
+            <td>
+                <!--
+                    Поле ввода даты начала ремонта.
+                    onchange — сразу отправляем дату на сервер.
+                    Машина автоматически становится в ремонте.
+                    Вывести из ремонта можно только кнопкой.
+                -->
+                <input
+                    type="datetime-local"
+                    class="${dateClass}"
+                    value="${dateValue}"
+                    onchange="setRepairDate(${m.id}, this.value, this)"
+                    ${m.is_in_repair && !dateValue ? 'disabled' : ''}
+                />
+            </td>
+            <td>
+                <!--
+                    Кнопка "В ремонт" — если даты нет.
+                    Кнопка "Завершить ремонт" — всегда если в ремонте.
+                    Завершить можно только кнопкой, дата очищается.
+                -->
+                <button class="btn-repair ${btnClass}"
+                        onclick="toggleRepair(${m.id})">
+                    ${btnText}
+                </button>
+            </td>
+        </tr>
+    `;
+}
+
+function renderAll(machines) {
+    const tbody = document.getElementById('machine-list');
+    tbody.innerHTML = machines.map(buildRow).join('');
+}
+
+function updateRow(machine) {
+    const row = document.getElementById('row-' + machine.id);
+    if (row) row.outerHTML = buildRow(machine);
+}
+
+function toggleRepair(machineId) {
+    ws.send(JSON.stringify({
+        action: 'toggle_repair',
+        machine_id: machineId
+    }));
+}
+
+function setRepairDate(machineId, dateValue, inputEl) {
+    if (!dateValue) return;
+
+    // Подсвечиваем поле — дата принята
+    inputEl.classList.add('has-value');
+
+    // Отправляем на сервер — машина автоматически встанет в ремонт
+    // КТГ пересчитается сразу от этой даты
+    ws.send(JSON.stringify({
+        action: 'set_repair_date',
+        machine_id: machineId,
+        repair_date: dateValue   // формат: '2026-06-15T08:00'
+    }));
+}
+</script>
 {% endblock %}
