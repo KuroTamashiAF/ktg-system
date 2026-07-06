@@ -72,3 +72,27 @@ body {
 
     padding: 30px;
 }
+
+.nav-logout {
+    background: none;
+    border: none;
+    color: white;
+    text-decoration: none;
+    padding: 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 16px;
+    font-family: Segoe UI, Arial, sans-serif;
+    text-align: left;
+    width: 100%;
+}
+
+.nav-logout:hover {
+    background: #374151;
+}
+
+/* Форма выхода — убираем отступы чтобы кнопка выглядела как ссылка */
+.logout-form {
+    margin: 0;
+    padding: 0;
+}

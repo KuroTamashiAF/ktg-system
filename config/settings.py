@@ -154,9 +154,9 @@ LOGGING = {
         "level": "INFO",
     },
 }
-LOGIN_URL = "login"
-LOGIN_REDIRECT_URL = "dashboard"
-LOGOUT_REDIRECT_URL = "login"
+LOGIN_URL = "accounts:login"
+LOGIN_REDIRECT_URL = "fleet:dashboard"
+LOGOUT_REDIRECT_URL = "accounts:login"
 
 ASGI_APPLICATION = "config.asgi.application"
 CHANNEL_LAYERS = {"default": {"BACKEND": "channels.layers.InMemoryChannelLayer"}}

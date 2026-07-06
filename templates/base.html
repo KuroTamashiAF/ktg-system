@@ -9,6 +9,9 @@
     <title>{% block title %}Система КТГ{% endblock %}</title>
     <link rel="stylesheet" href="{% static 'css/base.css' %}">
     <link rel="stylesheet" href="{% static 'css/layout.css' %}">
+
+    {% block css %}
+    {% endblock css %}
 </head>
 
 <body>
@@ -18,14 +21,17 @@
         <aside class="sidebar">
             <div class="logo">Система КТГ</div>
             <nav>
-                <a href="/">Главная</a>
+                <a href="{% url "fleet:dashboard" %}">Главная</a>
                 {% if request.user.is_staff %}
-                    <a href="/admin/">Администрирование</a>
+                    <a href="{% url "admin:index" %}">Администрирование</a>
                 {% endif %}
                 <a href="#">Машины</a>
                 <a href="#">Ремонты</a>
                 <a href="#">Документы</a>
-                <a href="/accounts/logout/">Выход</a>
+                <form action="{% url "accounts:logout" %}" method="post">
+                    {% csrf_token %}
+                    <button type="submit" class="nav-logout">Выход</button>  
+                </form>
             </nav>
         </aside>
     {% endif %}
