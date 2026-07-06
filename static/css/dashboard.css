@@ -1,0 +1,106 @@
+/* ── Dashboard ────────────────────────────────────────── */
+.dashboard-wrap { padding: 32px; }
+
+.dashboard-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 24px;
+}
+
+/* Статус WebSocket */
+.ws-badge {
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 600;
+}
+.ws-badge.connecting { background: #fef3c7; color: #92400e; }
+.ws-badge.online     { background: #d1fae5; color: #065f46; }
+.ws-badge.offline    { background: #fee2e2; color: #991b1b; }
+
+/* Таблица */
+.machine-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: white;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.07);
+}
+.machine-table th {
+    background: #1f2937;
+    color: white;
+    padding: 14px 18px;
+    text-align: left;
+    font-size: 14px;
+}
+.machine-table td {
+    padding: 12px 18px;
+    border-bottom: 1px solid #f3f4f6;
+    font-size: 14px;
+}
+.machine-table tr:last-child td { border-bottom: none; }
+.machine-table tr:hover td { background: #f9fafb; }
+
+/* КТГ */
+.ktg-value { font-weight: 700; font-size: 15px; }
+.ktg-small { font-size: 11px; color: #9ca3af; margin-top: 2px; }
+.ktg-updated { font-size: 11px; color: #9ca3af; margin-top: 2px; }
+.ktg-bar {
+    width: 100px; height: 6px;
+    background: #e5e7eb;
+    border-radius: 4px;
+    margin-top: 4px;
+}
+.ktg-bar-fill {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.4s ease;
+}
+
+/* Статус бейдж */
+.badge {
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+}
+.badge.repair { background: #fee2e2; color: #991b1b; }
+.badge.active { background: #d1fae5; color: #065f46; }
+
+/* Поле даты */
+.date-input {
+    font-size: 12px;
+    padding: 6px 8px;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    color: #374151;
+    cursor: pointer;
+    width: 180px;
+}
+.date-input:focus {
+    outline: none;
+    border-color: #3b82f6;
+}
+.date-input.has-value {
+    border-color: #f59e0b;
+    background: #fffbeb;
+    color: #92400e;
+    font-weight: 600;
+}
+
+/* Кнопки ремонта */
+.btn-repair {
+    padding: 8px 16px;
+    border: none;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+.btn-repair.send         { background: #fee2e2; color: #991b1b; }
+.btn-repair.send:hover   { background: #fca5a5; }
+.btn-repair.finish       { background: #d1fae5; color: #065f46; }
+.btn-repair.finish:hover { background: #6ee7b7; }

@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 
 # Режим тестирования — True = быстрое снижение для демонстрации
 # False = реальный расчёт по месяцу
-TEST_MODE = True
+TEST_MODE = False
 
 # В тестовом режиме снижаем на столько за тик
 TEST_STEP = 0.001  # за 10 сек = 0.001, за 100 тиков = 0.1
