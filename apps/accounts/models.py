@@ -4,12 +4,15 @@ from django.contrib.auth.models import AbstractUser
 # Create your models here.
 
 
-
-
 class Section(models.Model):
     """Участок"""
 
     name = models.CharField(max_length=50, verbose_name="Название участка")
+    # Часовой пояс участка — у каждого участка может быть свой
+    # Используется для отображения времени в правильной зоне
+    timezone = models.CharField(
+        max_length=50, default="Asia/Krasnoyarsk", verbose_name="Часовой пояс"
+    )
 
     def __str__(self):
         return str(self.name)

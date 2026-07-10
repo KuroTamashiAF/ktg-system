@@ -37,5 +37,13 @@
 
 </div>
 
+
+
+{{ request.user.role|json_script:"user-role"}}
+<script>
+    // Читаем роль из Django — json_script защищает от XSS
+    const USER_ROLE = JSON.parse(document.getElementById('user-role').textContent);
+</script>
+
 <script src="{% static 'js/dashboard.js' %}"></script>
 {% endblock %}

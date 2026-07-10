@@ -7,6 +7,7 @@ class MachineAdmin(admin.ModelAdmin):
     list_display = (
         "name",
         "board_number",
+        "section",
         "ktg_value",
         "ktg_threshold",
         "is_in_repair",
@@ -20,6 +21,7 @@ class MachineAdmin(admin.ModelAdmin):
     fields = (
         "name",
         "board_number",
+        "section",
         "ktg_value",
         "ktg_threshold",
         "is_in_repair",

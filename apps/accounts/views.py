@@ -12,11 +12,11 @@ class UserLoginView(LoginView):
     # redirect_authenticated_user = True  — закомментировано, конфликтует
 
     def get_success_url(self):
-        """
-        После успешного входа — редиректим на выбор участка.
-        Не на dashboard сразу, а сначала выбрать участок.
-        """
-        return '/accounts/select-section/'
+        # Админ и диспетчер → выбор участка
+        # Остальные → сразу на dashboard своего участка
+        if self.request.user.role in ('admin', 'dispatcher'):
+            return '/accounts/select-section/'
+        return '/fleet/dashboard/'
 
 
 class UserLogoutView(LogoutView):
@@ -26,23 +26,27 @@ class UserLogoutView(LogoutView):
 @login_required
 def select_section_view(request):
     """
-    Страница выбора участка после входа.
-    GET  — показываем список участков.
-    POST — сохраняем выбранный участок и идём на dashboard.
+    Страница выбора участка.
+    Доступна только админу и диспетчеру.
+    Остальные автоматически редиректятся на dashboard своего участка.
     """
+    # Механик и viewer не должны попадать сюда
+    # У них участок уже привязан в профиле
+    if request.user.role not in ('admin', 'dispatcher'):
+        return redirect('fleet:dashboard')
+
     if request.method == 'POST':
         section_id = request.POST.get('section_id')
 
         if section_id:
-            # Сохраняем участок у пользователя
-            request.user.section_id = section_id
-            request.user.save()
+            # Временно меняем участок для просмотра
+            # Это не меняет постоянный участок пользователя в БД
+            # Сохраняем в сессию — не в модель
+            request.session['viewed_section_id'] = int(section_id)
 
-        # После выбора — на dashboard
-        return redirect('dashboard')
+        return redirect('fleet:dashboard')
 
-    # GET — показываем все доступные участки
     sections = Section.objects.all()
     return render(request, 'accounts/select_section.html', {
-        'sections': sections
+        'sections': sections,
     })

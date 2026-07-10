@@ -9,11 +9,14 @@ from apps.fleet.services.ktg_service import (
 )
 from datetime import datetime, timezone
 from dateutil.relativedelta import relativedelta
+from django.utils import timezone as dj_timezone
+import pytz
 
 KTG_TICK_INTERVAL = 10
 
 
 class FleetConsumer(AsyncWebsocketConsumer):
+    
 
     async def connect(self):
         await self.channel_layer.group_add("fleet", self.channel_name)
@@ -115,13 +118,16 @@ class FleetConsumer(AsyncWebsocketConsumer):
             if  machine.id in reset_ids:
                 continue
             if machine.ktg_calc_from is not None:
-                # Приоритет — ручная дата, пересчитываем целиком
-                machine.ktg_value = calculate_ktg_from_date(machine.ktg_calc_from)
-            else:
-                # Обычный режим — снижаем на шаг
-                machine.ktg_value = round(machine.ktg_value - step, 6)
-                if machine.ktg_value < 0:
-                    machine.ktg_value = 0
+                calc_ktg = calculate_ktg_from_date(machine.ktg_calc_from)
+                # Берём минимум — КТГ никогда не растёт в тике
+                # Если calc_ktg > текущего — значит дата свежая, снижаем на шаг
+                if calc_ktg < machine.ktg_value:
+                    machine.ktg_value = calc_ktg
+                else:
+                    # Дата только что поставлена — снижаем на шаг от текущего
+                    machine.ktg_value = round(machine.ktg_value - step, 6)
+                    if machine.ktg_value < 0:
+                        machine.ktg_value = 0
 
      
             machine.save()
@@ -162,7 +168,33 @@ class FleetConsumer(AsyncWebsocketConsumer):
 
     @database_sync_to_async
     def get_machines(self):
-        return [self._serialize(m) for m in Machine.objects.all().order_by("name")]
+        user = self.scope["user"]
+        session = self.scope["session"]
+
+        # Для админа и диспетчера — смотрим что выбрано в сессии
+        # Они могут переключаться между участками
+        if user.role in ('admin', 'dispatcher'):
+            section_id = session.get('viewed_section_id')
+            if section_id:
+                machines = Machine.objects.filter(
+                    section_id=section_id
+                ).select_related("section").order_by("name")
+            else:
+                # Участок не выбран — показываем все машины
+                machines = Machine.objects.all().select_related("section").order_by("name")
+
+        else:
+            # Механик и viewer — только свой участок из профиля
+            if user.section_id:
+                machines = Machine.objects.filter(
+                    section_id=user.section_id
+                ).select_related("section").order_by("name")
+            else:
+                machines = Machine.objects.all().select_related("section").order_by("name")
+
+        return [self._serialize(m) for m in machines]
+
+
 
     @database_sync_to_async
     def toggle_repair(self, machine_id, user_id):
@@ -170,8 +202,20 @@ class FleetConsumer(AsyncWebsocketConsumer):
         machine.is_in_repair = not machine.is_in_repair
 
         if machine.is_in_repair:
+             # Ставим дату начала ремонта если не введена вручную
+
+            if machine.repair_started_at is None:                               # при нажитии кнопки что бы дата сама ставилась. 
+                machine.repair_started_at = dj_timezone.now()
+                machine.ktg_calc_from = machine.repair_started_at
+
+            # НЕ пересчитываем КТГ при нажатии кнопки!
+            # КТГ будет снижаться с текущего значения в следующем тике
+            # Пересчёт только если дата введена вручную (repair_started_at в прошлом)
+
             if machine.ktg_calc_from  is not None:
-                machine.ktg_value = calculate_ktg_from_date(machine.ktg_calc_from)
+                calc_ktg = calculate_ktg_from_date(machine.ktg_calc_from)
+                 # Берём минимум — не даём КТГ расти выше текущего значения
+                machine.ktg_value = min(machine.ktg_value, calc_ktg)
             machine.save()
 
             RepairLog.objects.create(machine=machine, user_id=user_id, is_active=True)
@@ -186,6 +230,23 @@ class FleetConsumer(AsyncWebsocketConsumer):
             )
 
         return self._serialize(machine)
+    
+    def _localize_dt(self, dt, section):
+        """
+        Конвертирует UTC время в часовой пояс участка.
+        Если участок не задан — используем UTC.
+        """
+        # Берём timezone участка или UTC если участка нет
+        tz_name = section.timezone if section else 'UTC'
+        
+        try:
+            tz = pytz.timezone(tz_name)
+        except pytz.exceptions.UnknownTimeZoneError:
+            tz = pytz.utc
+            
+        # Конвертируем и возвращаем ISO строку
+        return dt.astimezone(tz).isoformat()
+
 
     def _serialize(self, m):
         return {
@@ -196,6 +257,7 @@ class FleetConsumer(AsyncWebsocketConsumer):
             "ktg_threshold": m.ktg_threshold,
             "is_in_repair": m.is_in_repair,
             "repair_started_at": (
-                m.repair_started_at.isoformat() if m.repair_started_at else None
+                self._localize_dt(m.repair_started_at, m.section)
+                if m.repair_started_at else None
             ),
         }
