@@ -10,8 +10,8 @@ from apps.accounts.models import User, Section
 
 @admin.register(Section)
 class SectionAdmin(admin.ModelAdmin):
-    list_display = ('name',)
-    search_fields = ('name',)
+    list_display = ('name','timezone',)
+    search_fields = ('name',"timezone",)
 
 
 @admin.register(User)

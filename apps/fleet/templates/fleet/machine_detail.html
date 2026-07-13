@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+{% load static %}
+{% load tz %}
+
+{% block css %}
+<!-- Автообновление каждые 30 секунд -->
+<meta http-equiv="refresh" content="30">
+<link rel="stylesheet" href="{% static 'css/machine_detail.css' %}">
+{% endblock css %}
+
+{% block title %}{{ machine.name }}{% endblock %}
+
+{% block content %}
+
+{# ── Верхняя часть — инфо о машине ──────────────────── #}
+<div class="machine-detail-wrap">
+
+    <div class="machine-header">
+
+        {# Фото машины #}
+        <div class="machine-photo">
+            {% if machine.image %}
+                <img src="{{ machine.image.url }}" alt="{{ machine.name }}">
+            {% else %}
+                <div class="machine-photo-placeholder">
+                    Нет фото
+                </div>
+            {% endif %}
+        </div>
+
+        {# Основная инфо #}
+        <div class="machine-info">
+            <h1>{{ machine.name }}</h1>
+            <p class="machine-board">Бортовой номер: <strong>{{ machine.board_number }}</strong></p>
+            <p>Участок: <strong>{{ machine.section.name|default:"—" }}</strong></p>
+            <p>Статус:
+                {% if machine.is_in_repair %}
+                    <span class="badge repair">В ремонте</span>
+                {% else %}
+                    <span class="badge active">Работает</span>
+                {% endif %}
+            </p>
+            <p>Начало ремонта: <strong>
+                {{ machine.repair_started_at|timezone:machine.section.timezone|date:"d.m.Y H:i"|default:"—" }}
+            </strong></p>
+            <p>Плановый сброс КТГ: <strong>
+                {{ machine.ktg_reset_at|timezone:machine.section.timezone|date:"d.m.Y H:i"|default:"—" }}
+            </strong></p>
+        </div>
+
+        {# КТГ блок #}
+        <div class="machine-ktg-block">
+            <div class="ktg-circle">
+                <span class="ktg-number">{{ machine.ktg_value|floatformat:4 }}</span>
+                <span class="ktg-label">КТГ</span>
+            </div>
+            <p class="ktg-threshold">Порог: {{ machine.ktg_threshold|floatformat:2 }}</p>
+        </div>
+
+    </div>
+
+    {# ── История ремонтов ────────────────────────────── #}
+    <div class="machine-section">
+        <h2>История ремонтов</h2>
+        <table class="detail-table">
+            <thead>
+                <tr>
+                    <th>Кто отправил</th>
+                    <th>Начало</th>
+                    <th>Завершён</th>
+                    <th>Статус</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for repair in repairs %}
+                <tr>
+                    <td>{{ repair.user.get_full_name|default:repair.user.username }}</td>
+                    <td>
+                        {% if repair.repair_started_at %}
+                            {{ repair.repair_started_at|timezone:machine.section.timezone|date:"d.m.Y H:i" }}
+                        {% else %}
+                            {{ repair.created_at|timezone:machine.section.timezone|date:"d.m.Y H:i" }}
+                        {% endif %}
+                    </td>
+                    <td>{{ repair.finished_at|timezone:machine.section.timezone|date:"d.m.Y H:i"|default:"—" }}</td>
+                    <td>
+                        {% if repair.is_active %}
+                            <span class="badge repair">Активен</span>
+                        {% else %}
+                            <span class="badge active">Завершён</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="4">Ремонтов не было</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {# ── Результаты КТГ за периоды ───────────────────── #}
+    <div class="machine-section">
+        <h2>Результаты КТГ по периодам</h2>
+        <table class="detail-table">
+            <thead>
+                <tr>
+                    <th>Период</th>
+                    <th>Итоговый КТГ</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for result in ktg_results %}
+                <tr>
+                    <td>{{ result.period_start|date:"d.m.Y" }} — {{ result.period_end|date:"d.m.Y" }}</td>
+                    <td>{{ result.value|floatformat:4 }}</td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="2">Данных пока нет</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+</div>
+
+{% endblock %}

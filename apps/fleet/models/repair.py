@@ -19,6 +19,13 @@ class RepairLog(TimeStampeModel):
         null=True,
         verbose_name='Кто отправил'
     )
+    # Фактическая дата начала ремонта — может отличаться от created_at
+    # Если дата введена вручную — берём её, иначе created_at
+    repair_started_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name='Начало ремонта'
+    )
 
     finished_at = models.DateTimeField(
         null=True,

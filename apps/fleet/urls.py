@@ -19,8 +19,9 @@ app_name = "fleet"
 
 
 from django.urls import path
-from apps.fleet.views import DashboardView
+from apps.fleet.views import DashboardView, MachineDetailView
 
 urlpatterns = [
     path("dashboard/", DashboardView.as_view(), name="dashboard"),
+    path("machine/<int:pk>/", MachineDetailView.as_view(), name="machine_detail"),
 ]

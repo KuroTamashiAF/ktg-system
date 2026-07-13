@@ -104,3 +104,14 @@
 .btn-repair.send:hover   { background: #fca5a5; }
 .btn-repair.finish       { background: #d1fae5; color: #065f46; }
 .btn-repair.finish:hover { background: #6ee7b7; }
+
+.machine-link {
+    color: #1f2937;
+    text-decoration: none;
+    font-weight: 600;
+}
+
+.machine-link:hover {
+    color: #3b82f6;
+    text-decoration: underline;
+}

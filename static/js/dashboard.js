@@ -79,7 +79,11 @@ function buildRow(m) {
 
     return `
         <tr id="row-${m.id}">
-            <td>${m.name}</td>
+            <td>
+                <a href="/fleet/machine/${m.id}/" class="machine-link">
+                    ${m.name}
+                </a>
+            </td>
             <td>${m.board_number}</td>
             <td>
                 <span class="ktg-value" style="color:${color}">${pct}%</span>

@@ -14,7 +14,14 @@
 <div class="dashboard-wrap">
 
     <div class="dashboard-header">
+        <div>
         <h1>Диспетчерская панель</h1>
+        {% if current_section %}
+            <p class="dashboard-section-name">
+                Участок: <strong>{{ current_section.name }}</strong>
+            </p>
+        {% endif %}
+    </div>
         <span id="ws-status" class="ws-badge connecting">Подключение...</span>
     </div>
 
