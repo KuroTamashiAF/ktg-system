@@ -46,7 +46,32 @@
             <p>Плановый сброс КТГ: <strong>
                 {{ machine.ktg_reset_at|timezone:machine.section.timezone|date:"d.m.Y H:i"|default:"—" }}
             </strong></p>
+            <p>Заказчик: <strong>{{ machine.customer|default:"—" }}</strong></p>
+            <p>Серийный номер: <strong>{{ machine.serial_number|default:"—" }}</strong></p>
+            <p>Номер проекта: <strong>{{ machine.project_number|default:"—" }}</strong></p>
+
+            {# Моточасы — форма ввода только для admin и dispatcher #}
+            {# Ошибка ввода моточасов #}
+            {% if request.session.hours_error %}
+                <p class="hours-error">⚠️ {{ request.session.hours_error }}</p>
+            {% endif %}
+            <div class="engine-hours-block">
+                <span>Моточасы: <strong id="engine-hours-val">{{ machine.engine_hours }}</strong></span>
+                {% if request.user.role in 'admin,dispatcher,mechanic' %}
+                    <button class="btn-edit-hours" onclick="toggleHoursForm()">✏️</button>
+                    <form id="hours-form" style="display:none" method="POST"
+                        action="{% url 'fleet:update_engine_hours' machine.pk %}">
+                        {% csrf_token %}
+                        <input type="number" name="engine_hours" step="0.1" min="0"
+                            value="{{ machine.engine_hours }}"
+                            class="hours-input">
+                        <button type="submit" class="btn-save-hours">Сохранить</button>
+                        <button type="button" onclick="toggleHoursForm()">Отмена</button>
+                    </form>
+                {% endif %}
+            </div>
         </div>
+
 
         {# КТГ блок #}
         <div class="machine-ktg-block">
@@ -62,6 +87,15 @@
     {# ── История ремонтов ────────────────────────────── #}
     <div class="machine-section">
         <h2>История ремонтов</h2>
+        {# История ремонтов #}
+        <div class="machine-section">
+            <div class="section-header">
+                <h2>История ремонтов</h2>
+                <a href="{% url 'fleet:export_repairs' machine.pk %}" class="btn-export">
+                    Экспорт в Excel
+                </a>
+            </div>
+
         <table class="detail-table">
             <thead>
                 <tr>
@@ -103,6 +137,14 @@
     {# ── Результаты КТГ за периоды ───────────────────── #}
     <div class="machine-section">
         <h2>Результаты КТГ по периодам</h2>
+        <div class="machine-section">
+        <div class="section-header">
+            <h2>Результаты КТГ по периодам</h2>
+            <a href="{% url 'fleet:export_ktg' machine.pk %}" class="btn-export">
+                Экспорт в Excel
+            </a>
+        </div>
+
         <table class="detail-table">
             <thead>
                 <tr>
@@ -126,5 +168,138 @@
     </div>
 
 </div>
+{# ── Графики ─────────────────────────────────────────── #}
+
+{# График истории КТГ #}
+<div class="machine-section">
+    <h2>График КТГ</h2>
+    <canvas id="ktg-chart" height="100"></canvas>
+</div>
+
+{# График продолжительности ремонтов #}
+<div class="machine-section">
+    <div class="section-header">
+        <h2>Продолжительность ремонтов</h2>
+        <div class="period-btns">
+            <button class="period-btn active" onclick="loadRepairs(7)">7 дней</button>
+            <button class="period-btn" onclick="loadRepairs(30)">1 месяц</button>
+            <button class="period-btn" onclick="loadRepairs(90)">Квартал</button>
+            <button class="period-btn" onclick="loadRepairs(180)">Полгода</button>
+            <button class="period-btn" onclick="loadRepairs(365)">Год</button>
+        </div>
+    </div>
+    <canvas id="repairs-chart" height="100"></canvas>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    // ── График КТГ ───────────────────────────────────────
+    fetch("{% url 'fleet:api_ktg' machine.pk %}")
+        .then(r => r.json())
+        .then(data => {
+            const ctx = document.getElementById('ktg-chart').getContext('2d');
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: data.labels,
+                    datasets: [{
+                        label: 'КТГ %',
+                        data: data.values,
+                        borderColor: '#16a34a',
+                        backgroundColor: 'rgba(22,163,74,0.1)',
+                        borderWidth: 2,
+                        pointRadius: 2,
+                        tension: 0.3,
+                        fill: true,
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: ctx => `КТГ: ${ctx.parsed.y}%`
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            min: 0,
+                            max: 100,
+                            ticks: {
+                                callback: val => val + '%'
+                            }
+                        }
+                    }
+                }
+            });
+        });
+
+    // ── График ремонтов ──────────────────────────────────
+    let repairsChart = null;
+
+    function loadRepairs(period) {
+        // Подсвечиваем активную кнопку
+        document.querySelectorAll('.period-btn').forEach(btn => {
+            btn.classList.remove('active');
+            if (btn.textContent.includes(period === 7 ? '7' : period === 30 ? '1' : period === 90 ? 'Кв' : period === 180 ? 'Пол' : 'Год')) {
+                btn.classList.add('active');
+            }
+        });
+
+        fetch(`{% url 'fleet:api_repairs' machine.pk %}?period=${period}`)
+            .then(r => r.json())
+            .then(data => {
+                const ctx = document.getElementById('repairs-chart').getContext('2d');
+
+                // Уничтожаем старый график перед созданием нового
+                if (repairsChart) repairsChart.destroy();
+
+                repairsChart = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: data.labels,
+                        datasets: [{
+                            label: 'Часы',
+                            data: data.values,
+                            backgroundColor: '#3b82f6',
+                            borderRadius: 4,
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: {
+                                callbacks: {
+                                    label: ctx => `${ctx.parsed.y} ч.`
+                                }
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                ticks: {
+                                    callback: val => val + ' ч.'
+                                }
+                            }
+                        }
+                    }
+                });
+            });
+    }
+
+    // Загружаем по умолчанию за 30 дней
+    loadRepairs(30);
+</script>
+<script>
+function toggleHoursForm() {
+    const form = document.getElementById('hours-form');
+    form.style.display = form.style.display === 'none' ? 'flex' : 'none';
+}
+</script>
+
+
 
 {% endblock %}

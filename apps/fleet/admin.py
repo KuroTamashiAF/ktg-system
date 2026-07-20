@@ -7,7 +7,9 @@ class MachineAdmin(admin.ModelAdmin):
     list_display = (
         "name",
         "board_number",
+        "customer",  # заказчик в списке
         "section",
+        "engine_hours",  # моточасы в списке
         "ktg_value",
         "ktg_threshold",
         "is_in_repair",
@@ -15,12 +17,16 @@ class MachineAdmin(admin.ModelAdmin):
         "ktg_reset_at",
     )
     list_filter = ("is_in_repair",)
-    search_fields = ("name", "board_number")
+    search_fields = ("name", "board_number", "customer")  # поиск по заказчику тоже
 
     # Поля доступные для редактирования в форме машины
     fields = (
         "name",
         "board_number",
+        "serial_number",
+        "project_number",
+        "customer",
+        "engine_hours",
         "section",
         "ktg_value",
         "ktg_threshold",

@@ -28,9 +28,11 @@
                 {% if  request.user.role == 'admin' or request.user.role == 'dispatcher'%}
                     <a href="{% url "accounts:select_section" %}">Участок</a>
                 {% endif %}
-                <a href="#">Машины</a>
-                <a href="#">Ремонты</a>
-                <a href="#">Документы</a>
+                {% if  request.user.role != 'viewer' %}
+                    <a href="#">Машины</a>
+                    <a href="#">Ремонты</a>
+                    <a href="#">Документы</a>
+                {% endif %}
                 <form action="{% url "accounts:logout" %}" method="post">
                     {% csrf_token %}
                     <button type="submit" class="nav-logout">Выход</button>  

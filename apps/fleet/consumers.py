@@ -268,6 +268,8 @@ class FleetConsumer(AsyncWebsocketConsumer):
             "id": m.id,
             "name": m.name,
             "board_number": m.board_number,
+            "customer": m.customer or "—",  # заказчик
+            "engine_hours": m.engine_hours,  # моточасы
             "ktg_value": round(m.ktg_value, 6),
             "ktg_threshold": m.ktg_threshold,
             "is_in_repair": m.is_in_repair,

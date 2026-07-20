@@ -137,3 +137,100 @@
 .detail-table tr:hover td {
     background: #f9fafb;
 }
+
+.section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.section-header h2 {
+    margin-bottom: 0;
+    padding-bottom: 0;
+    border-bottom: none;
+}
+
+.btn-export {
+    padding: 8px 16px;
+    background: #16a34a;
+    color: white;
+    border-radius: 8px;
+    text-decoration: none;
+    font-size: 13px;
+    font-weight: 600;
+    transition: all 0.2s ease;
+}
+
+.btn-export:hover {
+    background: #15803d;
+}
+/* Кнопки периода */
+.period-btns {
+    display: flex;
+    gap: 8px;
+}
+
+.period-btn {
+    padding: 6px 14px;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    background: white;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.period-btn:hover {
+    border-color: #3b82f6;
+    color: #3b82f6;
+}
+
+.period-btn.active {
+    background: #1f2937;
+    color: white;
+    border-color: #1f2937;
+}
+.engine-hours-block {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 8px;
+}
+
+.btn-edit-hours {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 16px;
+    padding: 2px 6px;
+}
+
+.hours-input {
+    width: 120px;
+    padding: 6px 8px;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    font-size: 14px;
+}
+
+.btn-save-hours {
+    padding: 6px 14px;
+    background: #16a34a;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 600;
+}
+.hours-error {
+    color: #dc2626;
+    font-size: 13px;
+    margin-top: 6px;
+    padding: 6px 10px;
+    background: #fee2e2;
+    border-radius: 6px;
+}

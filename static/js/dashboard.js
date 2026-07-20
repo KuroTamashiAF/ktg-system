@@ -38,7 +38,6 @@ function nowISOLocal() {
 // ── Строка таблицы ───────────────────────────────────────
 
 function buildRow(m) {
-    console.log(m);
     const pct       = (m.ktg_value * 100).toFixed(4);
     const raw       = m.ktg_value.toFixed(6);
     const threshold = (m.ktg_threshold * 100).toFixed(0);
@@ -85,6 +84,7 @@ function buildRow(m) {
                 </a>
             </td>
             <td>${m.board_number}</td>
+            <td>${m.customer}</td>
             <td>
                 <span class="ktg-value" style="color:${color}">${pct}%</span>
                 <div class="ktg-small">${raw}</div>
