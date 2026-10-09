@@ -11,6 +11,7 @@ from datetime import datetime, timezone
 from dateutil.relativedelta import relativedelta
 from django.utils import timezone as dj_timezone
 import pytz
+from apps.fleet.permissions import can_edit_machine
 
 KTG_TICK_INTERVAL = 10
 
@@ -18,6 +19,11 @@ KTG_TICK_INTERVAL = 10
 class FleetConsumer(AsyncWebsocketConsumer):
 
     async def connect(self):
+        user = self.scope["user"]
+        if not user.is_authenticated:
+            await self.close()
+            return
+
         await self.channel_layer.group_add("fleet", self.channel_name)
         await self.accept()
 
@@ -33,16 +39,18 @@ class FleetConsumer(AsyncWebsocketConsumer):
 
     async def receive(self, text_data):
         data = json.loads(text_data)
+        user = self.scope["user"]
 
         if data.get("action") == "toggle_repair":
             # Кнопка "в ремонт / завершить ремонт"
             machine_id = data.get("machine_id")
-            user_id = self.scope["user"].id
-            machine = await self.toggle_repair(machine_id, user_id)
+            # user_id = self.scope["user"].id
+            machine = await self.toggle_repair(machine_id, user)
 
-            await self.channel_layer.group_send(
-                "fleet", {"type": "fleet_update", "machine": machine}
-            )
+            if machine is not None:
+                await self.channel_layer.group_send(
+                    "fleet", {"type": "fleet_update", "machine": machine}
+                )
 
         elif data.get("action") == "set_repair_date":
             # Поле даты заполнено на dashboard
@@ -50,12 +58,13 @@ class FleetConsumer(AsyncWebsocketConsumer):
             # КТГ пересчитывается сразу от введённой даты
             machine_id = data.get("machine_id")
             repair_date = data.get("repair_date")  # строка ISO формата
-            user_id = self.scope["user"].id
-            machine = await self.set_repair_date(machine_id, repair_date, user_id)
+            # user_id = self.scope["user"].id
+            machine = await self.set_repair_date(machine_id, repair_date, user)
 
-            await self.channel_layer.group_send(
-                "fleet", {"type": "fleet_update", "machine": machine}
-            )
+            if machine is not None:
+                await self.channel_layer.group_send(
+                    "fleet", {"type": "fleet_update", "machine": machine}
+                )
 
     async def fleet_update(self, event):
         await self.send(
@@ -135,13 +144,16 @@ class FleetConsumer(AsyncWebsocketConsumer):
         return updated
 
     @database_sync_to_async
-    def set_repair_date(self, machine_id, repair_date_str, user_id):
+    def set_repair_date(self, machine_id, repair_date_str, user):
         """
         Устанавливает дату начала ремонта вручную.
         Машина автоматически становится в ремонте.
         КТГ пересчитывается сразу от введённой даты.
         """
         machine = Machine.objects.get(id=machine_id)
+
+        if not can_edit_machine(user, machine):
+            return None
 
         # Парсим дату из строки формата datetime-local: '2026-06-15T08:00'
         repair_started_at = datetime.fromisoformat(repair_date_str)
@@ -160,7 +172,7 @@ class FleetConsumer(AsyncWebsocketConsumer):
         if not RepairLog.objects.filter(machine=machine, is_active=True).exists():
             RepairLog.objects.create(
                 machine=machine,
-                user_id=user_id,
+                user=user,
                 is_active=True,
                 # Сохраняем введённую вручную дату
                 repair_started_at=machine.repair_started_at,
@@ -198,15 +210,16 @@ class FleetConsumer(AsyncWebsocketConsumer):
                     .order_by("name")
                 )
             else:
-                machines = (
-                    Machine.objects.all().select_related("section").order_by("name")
-                )
+                machines = Machine.objects.none()
 
         return [self._serialize(m) for m in machines]
 
     @database_sync_to_async
-    def toggle_repair(self, machine_id, user_id):
+    def toggle_repair(self, machine_id, user):
         machine = Machine.objects.get(id=machine_id)
+        if not can_edit_machine(user, machine):
+            return None
+        
         machine.is_in_repair = not machine.is_in_repair
 
         if machine.is_in_repair:
@@ -230,7 +243,7 @@ class FleetConsumer(AsyncWebsocketConsumer):
 
             RepairLog.objects.create(
                 machine=machine,
-                user_id=user_id,
+                user=user,
                 is_active=True,
                 # Сохраняем фактическую дату начала ремонта
                 repair_started_at=machine.repair_started_at,

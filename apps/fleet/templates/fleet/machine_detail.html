@@ -57,7 +57,7 @@
             {% endif %}
             <div class="engine-hours-block">
                 <span>Моточасы: <strong id="engine-hours-val">{{ machine.engine_hours }}</strong></span>
-                {% if request.user.role in 'admin,dispatcher,mechanic' %}
+                {% if can_edit %}
                     <button class="btn-edit-hours" onclick="toggleHoursForm()">✏️</button>
                     <form id="hours-form" style="display:none" method="POST"
                         action="{% url 'fleet:update_engine_hours' machine.pk %}">

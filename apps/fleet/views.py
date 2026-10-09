@@ -11,6 +11,11 @@ from apps.fleet.models import Machine, RepairLog
 from datetime import timedelta
 from django.utils import timezone as dj_timezone
 from apps.fleet.models import EngineHoursLog
+from apps.fleet.permissions import (
+    can_edit_machine,
+    can_view_machine,
+    machine_access_required,
+)
 
 
 # Create your views here.
@@ -28,6 +33,17 @@ class MachineDetailView(LoginRequiredMixin, UserPassesTestMixin, DetailView):
     model = Machine
     template_name = "fleet/machine_detail.html"
     context_object_name = "machine"  # в шаблоне будет {{ machine }}
+
+    def get_object(self, queryset=None):
+        """
+        UserPassesTestMixin вызывает test_func() ДО того, как DetailView
+        успевает сам загрузить self.object (это происходит позже, в get()).
+        Поэтому test_func вызывает get_object() сам — а здесь мы кэшируем
+        результат, чтобы машина не грузилась из БД второй раз в get().
+        """
+        if not hasattr(self, "_cached_object"):
+            self._cached_object = super().get_object(queryset)
+        return self._cached_object
 
     def get_context_data(self, **kwargs):
         """
@@ -57,10 +73,33 @@ class MachineDetailView(LoginRequiredMixin, UserPassesTestMixin, DetailView):
             "-created_at"
         )[:100]
 
+        # Может ли текущий пользователь редактировать эту машину
+        # (вносить моточасы, управлять ремонтом).
+        # Раньше шаблон сам угадывал это через
+        # {% if request.user.role in 'admin,dispatcher,mechanic' %} —
+        # ненадёжную substring-проверку строки. Теперь источник
+        # истины один — can_edit_machine() — и тот же самый, которым
+        # проверяется и сервер при сохранении формы.
+        context["can_edit"] = can_edit_machine(self.request.user, machine)
+
         return context
 
     def test_func(self):
-        return self.request.user.role != "viewer"
+        """
+        Раньше здесь была только проверка роли:
+            return self.request.user.role != "viewer"
+        Из-за этого viewer получал 403 на странице машины, хотя
+        дашборд показывает ссылку на неё для ВСЕХ ролей (имя роли —
+        "Просмотр" — как раз подразумевает чтение, а не запрет).
+        При этом mechanic мог открыть машину ЛЮБОГО участка, не только
+        своего — доступ не был привязан к участку вообще.
+
+        Теперь: can_view_machine() разрешает смотреть machine всем ролям
+        в рамках своего участка (admin/dispatcher — везде), а править
+        данные (кнопка, форма моточасов) can_edit_machine() всё равно
+        не даст viewer'у — это видно в шаблоне через can_edit.
+        """
+        return can_view_machine(self.request.user, self.get_object())
 
 
 def get_machine_timezone(machine):
@@ -81,13 +120,14 @@ def localize_dt(dt, tz):
 
 
 @login_required
-def export_repairs_excel(request, pk):
+@machine_access_required()
+def export_repairs_excel(request, pk, machine):
     """
     Выгрузка истории ремонтов машины в Excel.
     pk — ID машины.
     """
 
-    machine = Machine.objects.select_related("section").get(pk=pk)
+    # machine = Machine.objects.select_related("section").get(pk=pk)
     tz = get_machine_timezone(machine)
     repairs = (
         RepairLog.objects.filter(machine=machine)
@@ -172,13 +212,14 @@ def export_repairs_excel(request, pk):
 
 
 @login_required
-def export_ktg_results_excel(request, pk):
+@machine_access_required()
+def export_ktg_results_excel(request, pk, machine):
     """
     Выгрузка результатов КТГ по периодам в Excel.
     """
     from apps.fleet.models import Machine, KTGMonthResult
 
-    machine = Machine.objects.select_related("section").get(pk=pk)
+    # machine = Machine.objects.select_related("section").get(pk=pk)
     tz = get_machine_timezone(machine)
     results = KTGMonthResult.objects.filter(machine=machine).order_by("-period_end")
 
@@ -240,12 +281,13 @@ def export_ktg_results_excel(request, pk):
 
 
 @login_required
-def api_ktg_history(request, pk):
+@machine_access_required()
+def api_ktg_history(request, pk, machine):
     """
     API для графика истории КТГ.
     Возвращает JSON с метками времени и значениями КТГ.
     """
-    machine = Machine.objects.select_related("section").get(pk=pk)
+    # machine = Machine.objects.select_related("section").get(pk=pk)
     tz = get_machine_timezone(machine)
 
     # Берём последние 200 точек из истории
@@ -269,12 +311,13 @@ def api_ktg_history(request, pk):
 
 
 @login_required
-def api_repairs_history(request, pk):
+@machine_access_required()
+def api_repairs_history(request, pk, machine):
     """
     API для графика продолжительности ремонтов.
     Параметр period — количество дней (7/30/90/180/365).
     """
-    machine = Machine.objects.select_related("section").get(pk=pk)
+    # machine = Machine.objects.select_related("section").get(pk=pk)
     tz = get_machine_timezone(machine)
 
     # Читаем период из GET параметра — по умолчанию 30 дней
@@ -310,15 +353,16 @@ def api_repairs_history(request, pk):
 
 
 @login_required
-def update_engine_hours(request, pk):
+@machine_access_required(edit=True)
+def update_engine_hours(request, pk, machine):
     """
     Обновляем моточасы машины.
     Новое значение должно быть больше предыдущего.
     Записываем лог — кто и когда внёс.
     """
-    if request.method == 'POST':
-        machine = Machine.objects.get(pk=pk)
-        new_hours = request.POST.get('engine_hours')
+    if request.method == "POST":
+        #     machine = Machine.objects.get(pk=pk)
+        new_hours = request.POST.get("engine_hours")
 
         if new_hours:
             new_hours = float(new_hours)
@@ -326,11 +370,11 @@ def update_engine_hours(request, pk):
             # Проверяем — новое значение должно быть больше текущего
             if new_hours <= machine.engine_hours:
                 # Передаём ошибку в шаблон через сессию
-                request.session['hours_error'] = (
-                    f'Новое значение ({new_hours}) должно быть '
-                    f'больше текущего ({machine.engine_hours})'
+                request.session["hours_error"] = (
+                    f"Новое значение ({new_hours}) должно быть "
+                    f"больше текущего ({machine.engine_hours})"
                 )
-                return redirect('fleet:machine_detail', pk=pk)
+                return redirect("fleet:machine_detail", pk=pk)
 
             # Сохраняем новое значение
             machine.engine_hours = new_hours
@@ -338,12 +382,10 @@ def update_engine_hours(request, pk):
 
             # Записываем в лог
             EngineHoursLog.objects.create(
-                machine=machine,
-                value=new_hours,
-                user=request.user
+                machine=machine, value=new_hours, user=request.user
             )
 
             # Очищаем ошибку если была
-            request.session.pop('hours_error', None)
+            request.session.pop("hours_error", None)
 
-    return redirect('fleet:machine_detail', pk=pk)
+    return redirect("fleet:machine_detail", pk=pk)
