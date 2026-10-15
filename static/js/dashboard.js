@@ -111,7 +111,7 @@ function buildRow(m) {
 
 function renderAll(machines) {
     const tbody = document.getElementById('machine-list');
-    tbody.innerHTML = machines.map(buildRow).join('');
+    tbody.innerHTML = machines.map(buildRow).join('');              // возможно тут 
 }
 
 function updateRow(machine) {

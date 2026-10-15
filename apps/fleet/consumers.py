@@ -193,12 +193,12 @@ class FleetConsumer(AsyncWebsocketConsumer):
                 machines = (
                     Machine.objects.filter(section_id=section_id)
                     .select_related("section")
-                    .order_by("name")
+                    .order_by("ktg_value")
                 )
             else:
                 # Участок не выбран — показываем все машины
                 machines = (
-                    Machine.objects.all().select_related("section").order_by("name")
+                    Machine.objects.all().select_related("section").order_by("ktg_value")
                 )
 
         else:
