@@ -2,6 +2,13 @@
 const ws = new WebSocket('ws://' + window.location.host + '/ws/fleet/');
 const statusEl = document.getElementById('ws-status');
 
+// Все машины храним здесь — единый источник правды на фронте.
+let machinesById = {};
+
+// Индекс колонки «Начало ремонта» (0-based): Машина, Борт, Заказчик,
+// Моточасы, КТГ, Порог, Статус, Начало ремонта, Действие
+const DATE_COL = 7;
+
 ws.onopen = function() {
     statusEl.textContent = 'Онлайн';
     statusEl.className = 'ws-badge online';
@@ -15,9 +22,12 @@ ws.onclose = function() {
 ws.onmessage = function(event) {
     const data = JSON.parse(event.data);
     if (data.type === 'init') {
-        renderAll(data.machines);
+        machinesById = {};
+        data.machines.forEach(m => { machinesById[m.id] = m; });
+        renderAll();
     } else if (data.type === 'update') {
-        updateRow(data.machine);
+        machinesById[data.machine.id] = data.machine;
+        renderAll();
     }
 };
 
@@ -43,6 +53,10 @@ function buildRow(m) {
     const threshold = (m.ktg_threshold * 100).toFixed(0);
     const color     = ktgColor(m.ktg_value, m.ktg_threshold);
 
+    // КТГ ниже порога — подсвечиваем всю строку, а не только цифру
+    const isCritical = m.ktg_value < m.ktg_threshold;
+    const rowClass   = isCritical ? 'row-critical' : '';
+
     const status = m.is_in_repair
         ? '<span class="badge repair">Ремонт</span>'
         : '<span class="badge active">Работает</span>';
@@ -50,16 +64,15 @@ function buildRow(m) {
     const btnClass = m.is_in_repair ? 'finish' : 'send';
     const btnText  = m.is_in_repair ? 'Завершить ремонт' : 'В ремонт';
 
-    // Дата — объявляем ДО использования
     const dateValue = m.repair_started_at
         ? m.repair_started_at.slice(0, 16)
         : '';
     const dateClass = dateValue ? 'date-input has-value' : 'date-input';
 
-    // Проверяем роль — viewer только смотрит
+    // Это только про отображение. Реальная проверка прав — на сервере
+    // (consumers.py → can_edit_machine), её через консоль не обойти.
     const canEdit = USER_ROLE !== 'viewer';
 
-    // Поле даты — viewer видит только текст, остальные могут менять
     const dateField = canEdit ? `
         <input
             type="datetime-local"
@@ -69,7 +82,6 @@ function buildRow(m) {
             onchange="setRepairDate(${m.id}, this.value, this)"
         />` : dateValue ? `<span>${dateValue.replace('T', ' ')}</span>` : '—';
 
-    // Кнопка — viewer видит прочерк
     const repairBtn = canEdit ? `
         <button class="btn-repair ${btnClass}"
                 onclick="toggleRepair(${m.id})">
@@ -77,7 +89,7 @@ function buildRow(m) {
         </button>` : '—';
 
     return `
-        <tr id="row-${m.id}">
+        <tr id="row-${m.id}" class="${rowClass}">
             <td>
                 <a href="/fleet/machine/${m.id}/" class="machine-link">
                     ${m.name}
@@ -85,6 +97,7 @@ function buildRow(m) {
             </td>
             <td>${m.board_number}</td>
             <td>${m.customer}</td>
+            <td>${m.engine_hours}</td>
             <td>
                 <span class="ktg-value" style="color:${color}">${pct}%</span>
                 <div class="ktg-small">${raw}</div>
@@ -96,7 +109,7 @@ function buildRow(m) {
                 </div>
             </td>
             <td>
-                <span style="color:${m.ktg_value < m.ktg_threshold ? '#dc2626' : '#6b7280'}">
+                <span style="color:${isCritical ? '#dc2626' : '#6b7280'}">
                     ${threshold}%
                 </span>
             </td>
@@ -107,16 +120,75 @@ function buildRow(m) {
     `;
 }
 
-// ── Рендер ───────────────────────────────────────────────
+// Обновляет строку на месте: меняет классы и содержимое всех ячеек,
+// КРОМЕ ячейки с полем даты. Поле даты остаётся тем же DOM-элементом,
+// поэтому открытый календарь не закрывается, а КТГ и статус обновляются.
+function patchRow(tr, m) {
+    const tmp = document.createElement('tbody');
+    tmp.innerHTML = buildRow(m);
+    const fresh = tmp.firstElementChild;
 
-function renderAll(machines) {
-    const tbody = document.getElementById('machine-list');
-    tbody.innerHTML = machines.map(buildRow).join('');              // возможно тут 
+    tr.className = fresh.className;
+    for (let i = 0; i < fresh.cells.length; i++) {
+        if (i === DATE_COL) continue;
+        tr.cells[i].innerHTML = fresh.cells[i].innerHTML;
+    }
 }
 
-function updateRow(machine) {
-    const row = document.getElementById('row-' + machine.id);
-    if (row) row.outerHTML = buildRow(machine);
+// ── Рендер ───────────────────────────────────────────────
+
+function renderAll() {
+    const tbody = document.getElementById('machine-list');
+
+    // Самый низкий КТГ — наверх. При равном КТГ — по имени,
+    // чтобы строки с одинаковым значением не прыгали местами.
+    const sorted = Object.values(machinesById).sort((a, b) => {
+        if (a.ktg_value !== b.ktg_value) return a.ktg_value - b.ktg_value;
+        return a.name.localeCompare(b.name);
+    });
+
+    if (sorted.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="9">Машин нет</td></tr>';
+        return;
+    }
+
+    // Если сейчас в фокусе поле даты в таблице — не уничтожаем его строку.
+    // Фокус после Esc/Enter остаётся в поле, поэтому проверяем именно фокус,
+    // а не события клавиш (календарь их перехватывает).
+    const active = document.activeElement;
+    const keepTr = (active && active.tagName === 'INPUT' && tbody.contains(active))
+        ? active.closest('tr')
+        : null;
+
+    if (!keepTr) {
+        tbody.innerHTML = sorted.map(buildRow).join('');
+        return;
+    }
+
+    const keepId = keepTr.id;
+    const before = [];
+    const after  = [];
+    let passedKeep = false;
+    let keepMachine = null;
+
+    sorted.forEach(m => {
+        if (`row-${m.id}` === keepId) {
+            passedKeep = true;
+            keepMachine = m;
+            return;
+        }
+        (passedKeep ? after : before).push(buildRow(m));
+    });
+
+    // Обновляем текст строки с полем даты, не трогая сам input
+    if (keepMachine) patchRow(keepTr, keepMachine);
+
+    // Остальные строки пересоздаём и ставим в нужный порядок вокруг неё
+    Array.from(tbody.children).forEach(tr => {
+        if (tr !== keepTr) tr.remove();
+    });
+    keepTr.insertAdjacentHTML('beforebegin', before.join(''));
+    keepTr.insertAdjacentHTML('afterend', after.join(''));
 }
 
 // ── Действия ─────────────────────────────────────────────
